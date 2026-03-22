@@ -133,7 +133,7 @@ This project focuses on software-based analysis using aerial data and simulated 
 ## 👥 Team
 
 - Venkatesh Paitwar  
-- Sandarbh Singh  
+- Sandarbh Singh
 - Srushti Agrawal   
 - Shravani Borde  
 
