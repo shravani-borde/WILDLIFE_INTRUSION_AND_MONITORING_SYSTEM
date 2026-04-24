@@ -69,22 +69,6 @@ Visualizes detections, tracking, and risk alerts in real-time.
 - **Development:** Jupyter Notebook / Google Colab  
 
 ---
-```
-## 📂 Project Structure
-project/
-│── data/ # Datasets (images/videos)
-│── models/ # Trained models
-│── src/
-│ ├── detection.py # YOLO detection
-│ ├── tracking.py # DeepSORT tracking
-│ ├── coordination.py # Multi-drone logic
-│ ├── prediction.py # Risk analysis
-│── app.py # Dashboard application
-│── requirements.txt
-│── README.md
-
-```
----
 
 ## 📊 Evaluation Metrics
 
