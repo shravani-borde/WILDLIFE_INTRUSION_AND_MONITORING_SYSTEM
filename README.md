@@ -95,7 +95,7 @@ This project focuses on software-based analysis using aerial data and simulated 
 
 ---
 
-## 🌍 Applications
+## Applications
 
 - Forest and wildlife conservation  
 - Anti-poaching surveillance  
@@ -105,7 +105,7 @@ This project focuses on software-based analysis using aerial data and simulated 
 
 ---
 
-## 📚 Future Work
+## Future Work
 
 - Integration with real-time drone feeds  
 - Thermal imaging for night detection  
@@ -114,7 +114,7 @@ This project focuses on software-based analysis using aerial data and simulated 
 
 ---
 
-## 👥 Team
+## Team
 
 - Venkatesh Paitwar  
 - Sandarbh Singh
@@ -123,5 +123,5 @@ This project focuses on software-based analysis using aerial data and simulated 
 
 ---
 
-## 📌 Note
+## Note
 This project is developed as a **Third Year Project (Data Science / AI domain)** and focuses on real-world problem-solving using modern deep learning techniques.
