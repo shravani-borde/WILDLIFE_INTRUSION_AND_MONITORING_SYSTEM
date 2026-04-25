@@ -12,22 +12,22 @@ Rapid urbanization and habitat fragmentation have increased human–wildlife con
 
 ## Features
 
-### 🐾 Wildlife Detection & Tracking
+### Wildlife Detection & Tracking
 Detects and tracks animals using deep learning models.
 
-### 👤 Human & Poacher Detection
+### Human & Poacher Detection
 Identifies suspicious human activities in restricted zones.
 
-### 📊 Movement Analysis & Prediction
+### Movement Analysis & Prediction
 Analyzes animal movement patterns and predicts high-risk zones.
 
-### 🛸 Multi-Drone Coordination (Simulated)
+### Multi-Drone Coordination (Simulated)
 Allocates surveillance areas and avoids redundancy across drones.
 
-### 📡 Urban Wildlife Intrusion Detection
+### Urban Wildlife Intrusion Detection
 Detects wildlife entering urban areas and triggers alerts.
 
-### 📈 Interactive Dashboard
+### Interactive Dashboard
 Visualizes detections, tracking, and risk alerts in real-time.
 
 ---
