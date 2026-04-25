@@ -1,16 +1,16 @@
-# 🛸 AI-Based Multi-Drone Wildlife Monitoring & Intrusion Detection System
+# AI-Based Multi-Drone Wildlife Monitoring & Intrusion Detection System
 
-## 📌 Overview
+## Overview
 This project presents an AI-driven, software-based multi-drone monitoring system designed to address human–wildlife conflict and wildlife conservation challenges. The system uses aerial imagery (real or simulated) to detect, track, and analyze wildlife and human activities, enabling early detection of urban wildlife intrusion and potential poaching threats.
 
 ---
 
-## 🎯 Problem Statement
+## Problem Statement
 Rapid urbanization and habitat fragmentation have increased human–wildlife conflict and poaching threats. Traditional monitoring methods are manual and limited, leading to delayed detection. This project proposes an intelligent aerial monitoring system using AI and simulated multi-drone coordination to support proactive conservation and urban safety.
 
 ---
 
-## 🚀 Features
+## Features
 
 ### 🐾 Wildlife Detection & Tracking
 Detects and tracks animals using deep learning models.
