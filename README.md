@@ -32,7 +32,7 @@ Visualizes detections, tracking, and risk alerts in real-time.
 
 ---
 
-## 🧠 Methodology
+## Methodology
 
 ### 1. Data Collection & Preprocessing
 - Use UAV/wildlife datasets and simulated drone feeds  
@@ -58,7 +58,7 @@ Visualizes detections, tracking, and risk alerts in real-time.
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Language:** Python  
 - **Deep Learning:** PyTorch / TensorFlow  
