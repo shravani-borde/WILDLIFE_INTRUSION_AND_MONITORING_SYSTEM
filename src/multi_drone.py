@@ -21,8 +21,8 @@ import time
 import threading
 import cv2
 
-from detector import run_detection
-from tracker import ObjectTracker
+from src.detector import run_detection
+from src.tracker import ObjectTracker
 
 # ---------------------------------------------------------------------------
 # Config
@@ -30,7 +30,7 @@ from tracker import ObjectTracker
 
 STATE_FILE   = "data/multi_drone_state.json"
 FRAME_DIR    = "data/drone_frames"
-DEDUP_RADIUS = 80    # pixels — two detections within this distance = same target
+DEDUP_RADIUS_FRAC = 0.06   # WARNING FIX: 6% of frame width instead of fixed 80px
 DEDUP_SECS   = 2     # seconds — same target window across drone feeds
 
 
@@ -45,9 +45,10 @@ class DroneWorker:
     Writes results into a shared dict keyed by drone_id.
     """
 
-    def __init__(self, drone_id: str, source, shared_state: dict, lock: threading.Lock):
+    def __init__(self, drone_id: str, source, feed_label: str, shared_state: dict, lock: threading.Lock):
         self.drone_id     = drone_id
         self.source       = source
+        self.feed_label   = feed_label          # e.g. "wildlife" or "urban"
         self.shared_state = shared_state
         self.lock         = lock
         self.tracker      = ObjectTracker(max_age=30, n_init=3, max_cosine_distance=0.25)
@@ -88,6 +89,10 @@ class DroneWorker:
             tracks        = result["tracks"]
             poacher_alert = result["poacher_alert"]
 
+            # Resolution-aware dedup radius (WARNING FIX)
+            frame_w = frame.shape[1]
+            dedup_radius = int(frame_w * DEDUP_RADIUS_FRAC)
+
             # Save annotated frame
             vis = frame.copy()
             for t in tracks:
@@ -96,13 +101,20 @@ class DroneWorker:
                 cv2.rectangle(vis, (x, y), (x+w, y+h), color, 2)
                 cv2.putText(vis, f"{t['class_name']} #{t['track_id']}",
                             (x, max(y-6, 12)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
-            frame_path = os.path.join(frame_dir, "latest.jpg")
-            cv2.imwrite(frame_path, vis)
-
+            # WARNING FIX: write to .tmp then rename to avoid race condition
+            # where dashboard reads a half-written JPEG
+            frame_path     = os.path.join(frame_dir, "latest.jpg")
+            frame_path_tmp = os.path.join(frame_dir, "latest.tmp.jpg")
+            cv2.imwrite(frame_path_tmp, vis)
+            try:
+                os.replace(frame_path_tmp, frame_path)
+            except PermissionError:
+                pass
             # Write into shared state under this drone's key
             with self.lock:
                 self.shared_state[self.drone_id] = {
                     "drone_id":      self.drone_id,
+                    "feed_label":    self.feed_label,   # e.g. "wildlife" / "urban"
                     "frame_id":      frame_id,
                     "timestamp":     time.strftime("%Y-%m-%dT%H:%M:%S"),
                     "tracks":        tracks,
@@ -110,6 +122,7 @@ class DroneWorker:
                     "animal_count":  sum(1 for t in tracks if t["type"] == "animal"),
                     "human_count":   sum(1 for t in tracks if t["type"] == "human"),
                     "frame_path":    frame_path,
+                    "dedup_radius":  dedup_radius,      # expose for dashboard info
                 }
 
         cap.release()
@@ -172,7 +185,12 @@ class MultiDroneEngine:
                     continue
                 cx2, cy2 = other["center"]
                 dist = ((cx1 - cx2)**2 + (cy1 - cy2)**2) ** 0.5
-                if dist < DEDUP_RADIUS:
+                # Use the larger of the two drones' radii for cross-feed matching
+                radius = max(
+                    ev.get("dedup_radius", 80),
+                    other.get("dedup_radius", 80)
+                )
+                if dist < radius:
                     group.append(other)
                     used.add(j)
             used.add(i)
@@ -236,15 +254,20 @@ class MultiDroneEngine:
 # Entry point
 # ---------------------------------------------------------------------------
 
-def run(sources: list):
+def run(sources: list, feeds: list):
     shared_state = {}
     lock         = threading.Lock()
+
+    # Pad feed labels if fewer labels than sources were given
+    while len(feeds) < len(sources):
+        feeds.append(f"drone_{len(feeds)+1}")
 
     # Start one worker per source
     workers = []
     for i, src in enumerate(sources):
-        drone_id = f"drone_{i+1}"
-        worker   = DroneWorker(drone_id, src, shared_state, lock)
+        drone_id   = f"drone_{i+1}"
+        feed_label = feeds[i]
+        worker     = DroneWorker(drone_id, src, feed_label, shared_state, lock)
         workers.append(worker)
         worker.start()
 
@@ -267,7 +290,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Multi-drone surveillance simulation")
     parser.add_argument(
         "--sources", nargs="+", default=["0"],
-        help="List of sources: webcam index, video file paths. Each = one drone.",
+        help="List of sources: webcam index or video file paths. Each = one drone.",
+    )
+    parser.add_argument(
+        "--feeds", nargs="+", default=[],
+        help="Feed labels matching each source in order. e.g. --feeds wildlife urban",
     )
     args = parser.parse_args()
-    run(args.sources)
+    run(args.sources, args.feeds)

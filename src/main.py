@@ -22,8 +22,8 @@ import os
 import time
 import cv2
 
-from detector import run_detection
-from tracker import get_tracker
+from src.detector import run_detection
+from src.tracker import get_tracker
 
 # ---------------------------------------------------------------------------
 # Config

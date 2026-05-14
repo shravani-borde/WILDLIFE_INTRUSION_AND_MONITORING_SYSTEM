@@ -1,0 +1,1029 @@
+{
+  "timestamp": "2026-05-14T15:42:54",
+  "drone_count": 2,
+  "drone_states": {
+    "drone_2": {
+      "drone_id": "drone_2",
+      "feed_label": "wildlife",
+      "frame_id": 31,
+      "timestamp": "2026-05-14T15:42:54",
+      "tracks": [
+        {
+          "track_id": "1",
+          "bbox": [
+            298.0,
+            387.0,
+            77.0,
+            43.0
+          ],
+          "center": [
+            336.5,
+            408.5
+          ],
+          "class_name": "elephant",
+          "type": "animal",
+          "confidence": 0.8314
+        },
+        {
+          "track_id": "2",
+          "bbox": [
+            648.0,
+            412.0,
+            90.0,
+            58.0
+          ],
+          "center": [
+            693.0,
+            441.0
+          ],
+          "class_name": "elephant",
+          "type": "animal",
+          "confidence": 0.816
+        },
+        {
+          "track_id": "3",
+          "bbox": [
+            486.0,
+            471.0,
+            67.0,
+            73.0
+          ],
+          "center": [
+            519.5,
+            507.5
+          ],
+          "class_name": "elephant",
+          "type": "animal",
+          "confidence": 0.8092
+        },
+        {
+          "track_id": "4",
+          "bbox": [
+            604.0,
+            324.0,
+            73.0,
+            55.0
+          ],
+          "center": [
+            640.5,
+            351.5
+          ],
+          "class_name": "elephant",
+          "type": "animal",
+          "confidence": 0.7676
+        },
+        {
+          "track_id": "5",
+          "bbox": [
+            588.0,
+            436.0,
+            96.0,
+            62.0
+          ],
+          "center": [
+            636.0,
+            467.0
+          ],
+          "class_name": "elephant",
+          "type": "animal",
+          "confidence": 0.7445
+        },
+        {
+          "track_id": "6",
+          "bbox": [
+            791.0,
+            443.0,
+            61.0,
+            70.0
+          ],
+          "center": [
+            821.5,
+            478.0
+          ],
+          "class_name": "elephant",
+          "type": "animal",
+          "confidence": 0.7436
+        },
+        {
+          "track_id": "7",
+          "bbox": [
+            259.0,
+            405.0,
+            78.0,
+            56.0
+          ],
+          "center": [
+            298.0,
+            433.0
+          ],
+          "class_name": "elephant",
+          "type": "animal",
+          "confidence": 0.7397
+        },
+        {
+          "track_id": "8",
+          "bbox": [
+            787.0,
+            294.0,
+            41.0,
+            57.0
+          ],
+          "center": [
+            807.5,
+            322.5
+          ],
+          "class_name": "elephant",
+          "type": "animal",
+          "confidence": 0.595
+        },
+        {
+          "track_id": "9",
+          "bbox": [
+            1071.0,
+            725.0,
+            51.0,
+            117.0
+          ],
+          "center": [
+            1096.5,
+            783.5
+          ],
+          "class_name": "person",
+          "type": "human",
+          "confidence": 0.5618
+        },
+        {
+          "track_id": "10",
+          "bbox": [
+            953.0,
+            165.0,
+            27.0,
+            50.0
+          ],
+          "center": [
+            966.5,
+            190.0
+          ],
+          "class_name": "elephant",
+          "type": "animal",
+          "confidence": 0.5278
+        },
+        {
+          "track_id": "11",
+          "bbox": [
+            943.0,
+            35.0,
+            39.0,
+            39.0
+          ],
+          "center": [
+            962.5,
+            54.5
+          ],
+          "class_name": "elephant",
+          "type": "animal",
+          "confidence": 0.4662
+        },
+        {
+          "track_id": "12",
+          "bbox": [
+            682.0,
+            461.0,
+            38.0,
+            52.0
+          ],
+          "center": [
+            701.0,
+            487.0
+          ],
+          "class_name": "elephant",
+          "type": "animal",
+          "confidence": 0.3776
+        },
+        {
+          "track_id": "13",
+          "bbox": [
+            1023.0,
+            17.0,
+            21.0,
+            40.0
+          ],
+          "center": [
+            1033.5,
+            37.0
+          ],
+          "class_name": "elephant",
+          "type": "animal",
+          "confidence": 0.3666
+        },
+        {
+          "track_id": "14",
+          "bbox": [
+            921.0,
+            126.0,
+            25.0,
+            39.0
+          ],
+          "center": [
+            933.5,
+            145.5
+          ],
+          "class_name": "elephant",
+          "type": "animal",
+          "confidence": 0.2027
+        }
+      ],
+      "poacher_alert": true,
+      "animal_count": 13,
+      "human_count": 1,
+      "frame_path": "data/drone_frames\\drone_2\\latest.jpg",
+      "dedup_radius": 92
+    },
+    "drone_1": {
+      "drone_id": "drone_1",
+      "feed_label": "urban",
+      "frame_id": 23,
+      "timestamp": "2026-05-14T15:42:54",
+      "tracks": [
+        {
+          "track_id": "1",
+          "bbox": [
+            150.0,
+            171.0,
+            395.0,
+            308.0
+          ],
+          "center": [
+            347.5,
+            325.0
+          ],
+          "class_name": "person",
+          "type": "human",
+          "confidence": 0.9384
+        }
+      ],
+      "poacher_alert": false,
+      "animal_count": 0,
+      "human_count": 1,
+      "frame_path": "data/drone_frames\\drone_1\\latest.jpg",
+      "dedup_radius": 38
+    }
+  },
+  "deduplicated_tracks": [
+    {
+      "track_id": "1",
+      "bbox": [
+        150.0,
+        171.0,
+        395.0,
+        308.0
+      ],
+      "center": [
+        347.5,
+        325.0
+      ],
+      "class_name": "person",
+      "type": "human",
+      "confidence": 0.9384,
+      "drone_id": "drone_1",
+      "timestamp": "2026-05-14T15:42:54",
+      "confirmed_by": [
+        "drone_1"
+      ]
+    },
+    {
+      "track_id": "1",
+      "bbox": [
+        298.0,
+        387.0,
+        77.0,
+        43.0
+      ],
+      "center": [
+        336.5,
+        408.5
+      ],
+      "class_name": "elephant",
+      "type": "animal",
+      "confidence": 0.8314,
+      "drone_id": "drone_2",
+      "timestamp": "2026-05-14T15:42:54",
+      "confirmed_by": [
+        "drone_2"
+      ]
+    },
+    {
+      "track_id": "2",
+      "bbox": [
+        648.0,
+        412.0,
+        90.0,
+        58.0
+      ],
+      "center": [
+        693.0,
+        441.0
+      ],
+      "class_name": "elephant",
+      "type": "animal",
+      "confidence": 0.816,
+      "drone_id": "drone_2",
+      "timestamp": "2026-05-14T15:42:54",
+      "confirmed_by": [
+        "drone_2"
+      ]
+    },
+    {
+      "track_id": "3",
+      "bbox": [
+        486.0,
+        471.0,
+        67.0,
+        73.0
+      ],
+      "center": [
+        519.5,
+        507.5
+      ],
+      "class_name": "elephant",
+      "type": "animal",
+      "confidence": 0.8092,
+      "drone_id": "drone_2",
+      "timestamp": "2026-05-14T15:42:54",
+      "confirmed_by": [
+        "drone_2"
+      ]
+    },
+    {
+      "track_id": "4",
+      "bbox": [
+        604.0,
+        324.0,
+        73.0,
+        55.0
+      ],
+      "center": [
+        640.5,
+        351.5
+      ],
+      "class_name": "elephant",
+      "type": "animal",
+      "confidence": 0.7676,
+      "drone_id": "drone_2",
+      "timestamp": "2026-05-14T15:42:54",
+      "confirmed_by": [
+        "drone_2"
+      ]
+    },
+    {
+      "track_id": "6",
+      "bbox": [
+        791.0,
+        443.0,
+        61.0,
+        70.0
+      ],
+      "center": [
+        821.5,
+        478.0
+      ],
+      "class_name": "elephant",
+      "type": "animal",
+      "confidence": 0.7436,
+      "drone_id": "drone_2",
+      "timestamp": "2026-05-14T15:42:54",
+      "confirmed_by": [
+        "drone_2"
+      ]
+    },
+    {
+      "track_id": "9",
+      "bbox": [
+        1071.0,
+        725.0,
+        51.0,
+        117.0
+      ],
+      "center": [
+        1096.5,
+        783.5
+      ],
+      "class_name": "person",
+      "type": "human",
+      "confidence": 0.5618,
+      "drone_id": "drone_2",
+      "timestamp": "2026-05-14T15:42:54",
+      "confirmed_by": [
+        "drone_2"
+      ]
+    },
+    {
+      "track_id": "8",
+      "bbox": [
+        787.0,
+        294.0,
+        41.0,
+        57.0
+      ],
+      "center": [
+        807.5,
+        322.5
+      ],
+      "class_name": "elephant",
+      "type": "animal",
+      "confidence": 0.595,
+      "drone_id": "drone_2",
+      "timestamp": "2026-05-14T15:42:54",
+      "confirmed_by": [
+        "drone_2"
+      ]
+    },
+    {
+      "track_id": "10",
+      "bbox": [
+        953.0,
+        165.0,
+        27.0,
+        50.0
+      ],
+      "center": [
+        966.5,
+        190.0
+      ],
+      "class_name": "elephant",
+      "type": "animal",
+      "confidence": 0.5278,
+      "drone_id": "drone_2",
+      "timestamp": "2026-05-14T15:42:54",
+      "confirmed_by": [
+        "drone_2"
+      ]
+    },
+    {
+      "track_id": "11",
+      "bbox": [
+        943.0,
+        35.0,
+        39.0,
+        39.0
+      ],
+      "center": [
+        962.5,
+        54.5
+      ],
+      "class_name": "elephant",
+      "type": "animal",
+      "confidence": 0.4662,
+      "drone_id": "drone_2",
+      "timestamp": "2026-05-14T15:42:54",
+      "confirmed_by": [
+        "drone_2"
+      ]
+    }
+  ],
+  "animal_count": 8,
+  "human_count": 2,
+  "poacher_alert": true,
+  "alert_log": [
+    {
+      "timestamp": "2026-05-14T15:42:40",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:40",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:41",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:41",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:42",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:42",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:43",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:43",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:44",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 1,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:44",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 1,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:45",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 1,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:45",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 1,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:46",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:46",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:47",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:47",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:48",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:48",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:49",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:49",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:50",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:50",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:51",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:51",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:52",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:52",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:53",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:53",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:54",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    },
+    {
+      "timestamp": "2026-05-14T15:42:54",
+      "animals": [
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant",
+        "elephant"
+      ],
+      "humans": 2,
+      "drones": [
+        "drone_2",
+        "drone_1"
+      ]
+    }
+  ]
+}

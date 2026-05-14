@@ -17,10 +17,10 @@ BBOX FORMAT:
     deep_sort_realtime natively expects [left, top, w, h] == our [x, y, w, h].
     No xyxy conversion anywhere in this file.
 """
-
 from deep_sort_realtime.deepsort_tracker import DeepSort
-from animal_model_classes import ANIMAL_CLASSES
-from human_model_classes  import HUMAN_CLASSES
+
+from src.animal_model_classes import ANIMAL_CLASSES
+from src.human_model_classes import HUMAN_CLASSES
 
 # -- Class name -> type lookup sets ----------------------------------------
 _ANIMAL_NAMES: set[str] = set(ANIMAL_CLASSES.values())
