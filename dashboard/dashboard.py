@@ -1,646 +1,846 @@
-# ============================================================
-# dashboard/dashboard.py
-# ============================================================
-# Wildlife Intrusion Monitoring Dashboard
-# Multi-Drone Edition
-#
-# Backend pipeline (Terminal 1):
-#   py -3.11 multi_drone.py --sources LionVideo.mp4 0 --feeds wildlife urban
-#
-# This dashboard (Terminal 2):
-#   py -3.11 -m streamlit run dashboard.py
-#
-# Reads:  data/multi_drone_state.json   (written by MultiDroneEngine.tick())
-#         data/drone_frames/<id>/latest.jpg  (written atomically by DroneWorker)
-# ============================================================
-
-import json
-import os
-import time
-from collections import defaultdict
+"""
+dashboard/dashboard.py — Wildlife Monitoring Dashboard v4
+Run: streamlit run dashboard/dashboard.py
+"""
+import json, os, time, base64
+from collections import defaultdict, deque
 from pathlib import Path
-
 import streamlit as st
-from PIL import Image
-
-# ============================================================
-# CONSTANTS  — must match multi_drone.py
-# ============================================================
 
 STATE_FILE = "data/multi_drone_state.json"
 FRAME_DIR  = "data/drone_frames"
 
-# Maps drone_id → display label driven by --feeds argument order
-# drone_1 = first --sources entry, drone_2 = second, etc.
-FEED_LABELS = {
-    "drone_1": "🌿 Wildlife Feed",
-    "drone_2": "🏙️  Urban Feed",
-}
-
-# BUG FIX: was 0.1 s (10 fps) hammering the CPU.
-# 1.0 s matches the engine tick rate (~2/s) and is plenty for a dashboard.
-AUTO_REFRESH_SECS = 1.0
-
-# ============================================================
-# PAGE CONFIG
-# ============================================================
-
 st.set_page_config(
-    page_title="Wildlife Intrusion Monitoring System",
-    page_icon="🦁",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="AI Wildlife Monitoring System",
+    page_icon="🦁", layout="wide",
+    initial_sidebar_state="collapsed"
 )
-
-# ============================================================
-# CSS — WILDLIFE FOREST THEME
-# ============================================================
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-html, body, [class*="css"] { font-family:'Syne',sans-serif; }
-.stApp { background-color:#081108; color:#d8f0c8; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body,[class*="css"],.stApp{
+  font-family:'Inter',sans-serif!important;
+  background:#0B1120!important;
+  color:#E2E8F0!important;
+}
+section[data-testid="stSidebar"]{display:none}
+.block-container{padding:0!important;max-width:100%!important}
+header[data-testid="stHeader"]{display:none}
+div[data-testid="stVerticalBlock"]>div{padding:0!important}
+div[data-testid="stImage"] img{border-radius:0!important;width:100%!important;display:block}
 
-[data-testid="stSidebar"] {
-    background:linear-gradient(180deg,#0d1a0d,#132813);
-    border-right:1px solid #214221;
+/* ── TOP NAV ── */
+.topnav{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 24px;
+  background:#0D1526;
+  border-bottom:1px solid #1E2D4A;
 }
-[data-testid="stSidebar"] * { color:#b8e8a0 !important; }
+.brand{display:flex;align-items:center;gap:14px}
+.brand-icon{
+  width:48px;height:48px;border-radius:10px;
+  background:linear-gradient(135deg,#1B3A6B,#2563EB);
+  display:flex;align-items:center;justify-content:center;font-size:1.4rem;
+}
+.brand-title{font-size:1.1rem;font-weight:700;color:#F1F5F9;line-height:1.2}
+.brand-sub{font-size:.6rem;color:#3B82F6;letter-spacing:3px;text-transform:uppercase;margin-top:2px}
+.nav-right{display:flex;align-items:center;gap:12px}
+.nav-pill{
+  display:flex;align-items:center;gap:7px;
+  background:#111D35;border:1px solid #1E2D4A;border-radius:8px;
+  padding:7px 14px;font-size:.72rem;color:#94A3B8;
+}
+.nav-pill .val{color:#F1F5F9;font-weight:600}
+.op-dot{width:8px;height:8px;border-radius:50%;background:#22C55E;box-shadow:0 0 8px #22C55E;animation:blink 2s infinite}
+.op-dot.red{background:#EF4444;box-shadow:0 0 8px #EF4444;animation:blink .8s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
 
-/* Header */
-.main-header {
-    background:linear-gradient(135deg,#102510,#1a3d1a,#102510);
-    border:1px solid #2f5f2f; border-radius:18px;
-    padding:24px; margin-bottom:24px;
-    box-shadow:0 0 30px rgba(40,120,40,0.25);
+/* ── KPI ROW ── */
+.kpi-row{
+  display:grid;grid-template-columns:repeat(6,1fr);gap:1px;
+  background:#1E2D4A;border-bottom:1px solid #1E2D4A;
 }
-.main-header h1 { font-size:2.3rem; color:#89e05d; margin:0; font-weight:800; }
-.main-header p  { color:#71ba52; margin-top:8px;
-    font-family:'Space Mono',monospace; font-size:0.78rem; letter-spacing:2px; }
+.kpi-card{
+  background:#0D1526;padding:16px 20px;
+  display:flex;align-items:center;gap:14px;
+}
+.kpi-icon{
+  width:44px;height:44px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.3rem;flex-shrink:0;
+}
+.kpi-icon.blue{background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.3)}
+.kpi-icon.green{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3)}
+.kpi-icon.red{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3)}
+.kpi-icon.orange{background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.3)}
+.kpi-icon.purple{background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3)}
+.kpi-icon.cyan{background:rgba(6,182,212,.15);border:1px solid rgba(6,182,212,.3)}
+.kpi-label{font-size:.6rem;color:#64748B;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px}
+.kpi-value{font-size:1.8rem;font-weight:700;color:#F1F5F9;line-height:1}
+.kpi-sub{font-size:.62rem;margin-top:3px}
+.kpi-sub.green{color:#22C55E}
+.kpi-sub.red{color:#EF4444}
+.kpi-sub.blue{color:#3B82F6}
+.kpi-sub.orange{color:#F97316}
 
-/* Metric cards */
-.metric-card {
-    background:#0f1d0f; border:1px solid #2d5c2d;
-    border-radius:14px; padding:18px; text-align:center;
+/* ── SECTION LABEL ── */
+.sec-label{
+  display:flex;align-items:center;gap:8px;
+  font-size:.65rem;font-weight:600;color:#94A3B8;
+  text-transform:uppercase;letter-spacing:2px;
+  padding:10px 16px 8px;
+  border-bottom:1px solid #1E2D4A;
 }
-.metric-value { font-size:2.4rem; font-weight:800; color:#8cf060;
-    font-family:'Space Mono',monospace; }
-.metric-label { color:#6db54f; margin-top:6px; font-size:0.7rem;
-    letter-spacing:2px; text-transform:uppercase; font-family:'Space Mono',monospace; }
+.sec-label .live-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:#22C55E;box-shadow:0 0 5px #22C55E;
+  animation:blink 1.5s infinite;
+}
+.sec-label-right{margin-left:auto;font-size:.58rem;color:#3B82F6;cursor:pointer}
 
-/* Alert pulse */
-@keyframes redpulse {
-    0%,100%{ border-color:#2d5c2d; box-shadow:none; }
-    50%     { border-color:#ff4c4c; box-shadow:0 0 16px rgba(255,76,76,.5); }
-}
-.alert-active { animation:redpulse 1.2s infinite; }
-
-/* Banners */
-.poacher-banner {
-    background:#1b0c0c; border:2px solid #ff4c4c; border-radius:10px;
-    padding:14px 20px; text-align:center; animation:redpulse 1.2s infinite;
-    font-family:'Space Mono',monospace; font-size:.88rem; color:#ffb3b3;
-    margin-bottom:16px;
-}
-.safe-banner {
-    background:#0f1f0f; border:1px solid #2f5f2f; border-radius:10px;
-    padding:10px 20px; text-align:center;
-    font-family:'Space Mono',monospace; font-size:.78rem; color:#c8ffc8;
-    margin-bottom:16px;
-}
-
-/* Drone feed card */
-.feed-card {
-    border:1px solid #2b5b2b; border-radius:14px;
-    background:#0c150c; padding:10px; margin-bottom:14px;
-}
-.feed-header {
-    font-family:'Space Mono',monospace; font-size:.65rem;
-    letter-spacing:3px; text-transform:uppercase; color:#3a7a3a;
-    border-bottom:1px solid #1a381a; padding-bottom:7px; margin-bottom:10px;
-}
-
-/* Live dot */
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
-.dot-live { display:inline-block; width:8px; height:8px; border-radius:50%;
-    background:#8cf060; margin-right:6px; animation:blink 1.2s infinite; }
-.dot-wait { display:inline-block; width:8px; height:8px; border-radius:50%;
-    background:#444; margin-right:6px; }
-
-/* Track table */
-.track-table { width:100%; border-collapse:collapse; }
-.track-table th {
-    font-family:'Space Mono',monospace; font-size:.6rem; color:#2a6a2a;
-    text-transform:uppercase; letter-spacing:1px;
-    border-bottom:1px solid #2f5f2f; padding:4px 6px; text-align:left;
-}
-.track-table td {
-    font-family:'Space Mono',monospace; font-size:.68rem;
-    padding:4px 6px; border-bottom:1px solid #0f1e0f;
-}
-.tr-animal { color:#8cf060; }
-.tr-human  { color:#ff9999; }
-.tr-multi  { color:#ffe066; }
-
-/* Alert entry */
-.alert-danger {
-    background:#1b0c0c; border-left:4px solid #ff4c4c;
-    border-radius:8px; padding:10px; margin-bottom:8px;
-    color:#ffb3b3; font-family:'Space Mono',monospace; font-size:.68rem;
-}
-.alert-success {
-    background:#0f1f0f; border-left:4px solid #59d659;
-    border-radius:8px; padding:10px; margin-bottom:8px;
-    color:#c8ffc8; font-family:'Space Mono',monospace; font-size:.72rem;
+/* ── FEED ── */
+.feed-wrap{
+    background:#0D1526;
+    border:1px solid #1E2D4A;
+    border-radius:0;
 }
 
-/* Log box */
-.log-box {
-    background:#091109; border:1px solid #214221;
-    border-radius:10px; padding:12px; height:280px;
-    overflow-y:auto; font-family:'Space Mono',monospace; font-size:.7rem;
+.feed-topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:8px 14px;
+    background:#111D35;
+    border-bottom:1px solid #1E2D4A;
 }
 
-/* Section title */
-.sec {
-    font-size:.6rem; font-family:'Space Mono',monospace;
-    text-transform:uppercase; letter-spacing:3px; color:#3a7a3a;
-    border-bottom:1px solid #1a381a; padding-bottom:6px; margin:14px 0 10px;
+.feed-title{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-size:.72rem;
+    font-weight:600;
+    color:#F1F5F9;
 }
 
-/* Buttons */
-.stButton>button {
-    background:linear-gradient(135deg,#2d612d,#3f813f);
-    color:#e6ffe0; border-radius:10px; border:1px solid #65b565;
-    font-family:'Space Mono',monospace; transition:.2s;
+.feed-title .live-chip{
+    background:#22C55E;
+    color:#000;
+    font-size:.5rem;
+    font-weight:700;
+    padding:2px 6px;
+    border-radius:3px;
+    letter-spacing:1px;
 }
-.stButton>button:hover { border-color:#92ff92; }
 
-/* Waiting screen */
-.waiting {
-    text-align:center; padding:70px 20px;
-    font-family:'Space Mono',monospace; color:#2a5a2a;
+.feed-title .live-chip.alert{
+    background:#EF4444;
+    color:#fff;
+    animation:blink .8s infinite;
+}
+
+.feed-meta-right{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    font-size:.6rem;
+    color:#64748B;
+}
+
+.feed-meta-right .mv{
+    color:#94A3B8;
+}
+
+.feed-meta-right .sig{
+    display:flex;
+    align-items:center;
+    gap:3px;
+    color:#22C55E;
+}
+
+/* FIXED VIDEO AREA */
+.feed-imgbox{
+    position:relative;
+    background:#060D18;
+    overflow:hidden;
+    width:100%;
+    padding:0;
+    margin:0;
+    line-height:0;
+}
+
+/* MAKE IMAGE FILL CARD */
+.feed-imgbox img{
+    width:100%;
+    height:auto;
+    display:block;
+    object-fit:cover;
+}
+
+/* STREAMLIT IMAGE */
+.feed-imgbox > div{
+    width:100%;
+}
+
+.feed-imgbox > div img{
+    width:100% !important;
+    height:auto !important;
+    object-fit:cover;
+    display:block;
+}
+
+.feed-overlay-tl{
+    position:absolute;
+    top:10px;
+    left:10px;
+    z-index:10;
+}
+
+.feed-overlay-tr{
+    position:absolute;
+    top:10px;
+    right:10px;
+    z-index:10;
+}
+
+.intrusion-badge{
+    background:#EF4444;
+    color:#fff;
+    font-size:.52rem;
+    font-weight:700;
+    letter-spacing:1.5px;
+    padding:3px 8px;
+    border-radius:4px;
+    animation:blink .7s infinite;
+}
+
+.rec-badge{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    font-size:.58rem;
+    color:#EF4444;
+    font-family:'JetBrains Mono', monospace;
+}
+
+.rec-dot{
+    width:6px;
+    height:6px;
+    border-radius:50%;
+    background:#EF4444;
+    animation:blink 1s infinite;
+}
+
+.no-signal{
+    min-height:500px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    color:#1E3A5F;
+}
+
+.no-signal .ns-icon{
+    font-size:2.5rem;
+    opacity:.3;
+}
+
+.no-signal .ns-txt{
+    font-size:.6rem;
+    letter-spacing:3px;
+    margin-top:8px;
+    text-transform:uppercase;
+}
+
+.feed-bottombar{
+    display:flex;
+    gap:20px;
+    padding:8px 14px;
+    background:#0A1628;
+    border-top:1px solid #1E2D4A;
+    font-size:.65rem;
+    color:#64748B;
+}
+
+.feed-bottombar .fs{
+    display:flex;
+    align-items:center;
+    gap:5px;
+}
+
+.feed-bottombar .fv{
+    color:#94A3B8;
+    font-weight:600;
+}
+
+.feed-bottombar .fv.red{
+    color:#EF4444;
+}
+/* ── ALERT COMMAND CENTER ── */
+.acc-wrap{background:#0D1526;border:1px solid #1E2D4A;height:100%}
+.alert-card{
+  margin:8px;padding:10px 12px;border-radius:8px;
+  border:1px solid;cursor:pointer;transition:all .2s;
+}
+.alert-card.high{
+  background:linear-gradient(135deg,rgba(127,29,29,.5),rgba(69,10,10,.8));
+  border-color:rgba(239,68,68,.3);
+}
+.alert-card.medium{
+  background:rgba(120,53,15,.3);border-color:rgba(249,115,22,.25);
+}
+.alert-card.info{
+  background:rgba(30,58,138,.2);border-color:rgba(59,130,246,.2);
+}
+.alert-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.alert-title{font-size:.7rem;font-weight:600}
+.alert-title.red{color:#FCA5A5}
+.alert-title.orange{color:#FED7AA}
+.alert-title.blue{color:#BFDBFE}
+.alert-time{font-size:.58rem;color:#475569;font-family:'JetBrains Mono',monospace}
+.alert-desc{font-size:.65rem;color:#94A3B8;margin-bottom:6px}
+.alert-meta{display:flex;align-items:center;gap:10px;font-size:.58rem;color:#64748B}
+.alert-badge-pill{
+  padding:2px 8px;border-radius:3px;font-size:.55rem;font-weight:700;letter-spacing:1px;
+}
+.alert-badge-pill.high{background:#7F1D1D;color:#FCA5A5}
+.alert-badge-pill.medium{background:#7C2D12;color:#FED7AA}
+.alert-badge-pill.info{background:#1E3A8A;color:#BFDBFE}
+.alert-thumb{
+  width:50px;height:36px;border-radius:4px;
+  background:#1E3A8A;display:flex;align-items:center;justify-content:center;
+  font-size:1rem;flex-shrink:0;
+}
+
+/* ── DETECTIONS TABLE ── */
+.det-wrap{padding:0 0 8px;overflow-x:auto}
+.dt{width:100%;border-collapse:collapse;font-size:.66rem}
+.dt th{
+  font-size:.56rem;color:#475569;text-transform:uppercase;
+  letter-spacing:1.5px;padding:8px 12px;
+  border-bottom:1px solid #1E2D4A;text-align:left;
+  background:#0A1628;white-space:nowrap;
+}
+.dt td{
+  padding:8px 12px;border-bottom:1px solid #111D35;
+  color:#94A3B8;white-space:nowrap;
+}
+.dt tr:hover td{background:rgba(30,45,74,.4)}
+.dt td:first-child{color:#F1F5F9;font-weight:600;font-family:'JetBrains Mono',monospace}
+.type-pill{
+  display:inline-block;padding:2px 8px;border-radius:4px;
+  font-size:.56rem;font-weight:700;letter-spacing:1px;
+}
+.type-pill.animal{background:rgba(34,197,94,.15);color:#86EFAC;border:1px solid rgba(34,197,94,.2)}
+.type-pill.human{background:rgba(239,68,68,.15);color:#FCA5A5;border:1px solid rgba(239,68,68,.2)}
+.status-pill{
+  display:inline-block;padding:2px 8px;border-radius:4px;
+  font-size:.56rem;font-weight:600;
+}
+.status-pill.active{background:rgba(34,197,94,.1);color:#86EFAC}
+.status-pill.alert{background:rgba(239,68,68,.2);color:#FCA5A5;animation:blink 1s infinite}
+.conf-wrap{display:flex;align-items:center;gap:6px}
+.conf-bar-bg{width:50px;height:3px;background:#1E2D4A;border-radius:2px;overflow:hidden}
+.conf-bar-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,#2563EB,#60A5FA)}
+
+/* ── ANALYTICS ── */
+.analytics-wrap{padding:0 16px 16px}
+.sp-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #111D35;font-size:.65rem}
+.sp-name{width:80px;color:#CBD5E1}
+.sp-track{flex:1;height:5px;background:#1E2D4A;border-radius:3px;overflow:hidden}
+.sp-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#1D4ED8,#3B82F6)}
+.sp-cnt{width:22px;text-align:right;color:#475569}
+
+/* ── FLEET ── */
+.fleet-wrap{padding:0 12px 12px}
+.drone-card{
+  background:#111D35;border:1px solid #1E2D4A;border-radius:8px;
+  padding:12px;margin-bottom:8px;
+}
+.drone-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.drone-name{font-size:.75rem;font-weight:700;color:#F1F5F9;display:flex;align-items:center;gap:8px}
+.drone-name .icon{font-size:1.1rem}
+.online-badge{
+  display:flex;align-items:center;gap:4px;
+  font-size:.58rem;color:#22C55E;
+  font-family:'JetBrains Mono',monospace;
+}
+.online-dot{width:5px;height:5px;border-radius:50%;background:#22C55E;box-shadow:0 0 4px #22C55E}
+.drone-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.6rem;color:#64748B}
+.drone-grid span{color:#94A3B8}
+.drone-status-line{margin-top:6px;font-size:.58rem;font-family:'JetBrains Mono',monospace}
+
+/* ── TIMELINE ── */
+.timeline-wrap{padding:0 12px 12px;max-height:300px;overflow-y:auto}
+.tl-item{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #111D35;align-items:flex-start}
+.tl-left{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
+.tl-icon{
+  width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:.8rem;
+}
+.tl-icon.red{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.2)}
+.tl-icon.orange{background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.2)}
+.tl-icon.blue{background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.2)}
+.tl-icon.green{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.2)}
+.tl-time{font-size:.55rem;color:#3B82F6;font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.tl-content{flex:1}
+.tl-msg{font-size:.65rem;color:#CBD5E1;line-height:1.4}
+.tl-sub{font-size:.58rem;color:#475569;margin-top:1px}
+
+/* ── TREND CHART ── */
+.chart-placeholder{
+  background:#0A1628;border:1px solid #1E2D4A;border-radius:6px;
+  padding:16px;margin:0 16px 12px;
+  font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#475569;
+}
+.trend-area{position:relative;height:80px;margin-top:8px}
+.trend-label{font-size:.58rem;color:#475569;display:flex;justify-content:space-between;margin-top:4px}
+
+/* scrollbar */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:#0B1120}
+::-webkit-scrollbar-thumb{background:#1E2D4A;border-radius:2px}
+
+/* banner */
+.alert-banner{
+  padding:10px 24px;text-align:center;
+  font-size:.72rem;letter-spacing:2px;font-weight:600;
+}
+.alert-banner.danger{
+  background:linear-gradient(90deg,#450A0A,#7F1D1D,#450A0A);
+  color:#FCA5A5;border-bottom:1px solid rgba(239,68,68,.4);
+  animation:blink 1s infinite;
+}
+.alert-banner.safe{
+  background:#0A1628;color:#22C55E;
+  border-bottom:1px solid #1E2D4A;font-weight:400;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ============================================================
-# SESSION STATE
-# ============================================================
-
-if "system_running" not in st.session_state:
-    st.session_state.system_running = False
-
-# ============================================================
-# HELPERS
-# ============================================================
-
-def load_state() -> dict | None:
-    """
-    Load data/multi_drone_state.json written by MultiDroneEngine.tick().
-    Returns None if not present or mid-write.
-    """
+# ── helpers ──────────────────────────────────────────────────
+def load_state():
     try:
-        if not os.path.exists(STATE_FILE):
-            return None
-        with open(STATE_FILE, "r") as f:
-            return json.load(f)
-    except Exception:
-        return None
+        if not os.path.exists(STATE_FILE): return None
+        with open(STATE_FILE) as f: return json.load(f)
+    except: return None
 
-
-def load_frame(drone_id: str) -> Image.Image | None:
-    """
-    Load the latest annotated frame for a drone.
-    BUG FIX: .copy() releases the file handle immediately so the writer
-    (DroneWorker) is never blocked on Windows file locking.
-    Race condition on the write side is already fixed in multi_drone.py
-    via os.replace() atomic rename.
-    """
-    path = Path(FRAME_DIR) / drone_id / "latest.jpg"
-    if path.exists():
+def load_frame_b64(did):
+    p = Path(FRAME_DIR) / did / "latest.jpg"
+    if p.exists():
         try:
-            return Image.open(path).copy()
-        except Exception:
-            pass
+            with open(p,"rb") as f: return base64.b64encode(f.read()).decode()
+        except: pass
     return None
 
+def fmt_ts(iso):
+    return iso[11:19] if len(iso)>=19 else time.strftime("%H:%M:%S")
 
-def feed_label(drone_id: str) -> str:
-    return FEED_LABELS.get(drone_id, drone_id.upper().replace("_", " "))
+# ── session state ─────────────────────────────────────────────
+if "timeline" not in st.session_state:
+    st.session_state.timeline = deque([
+        {"time":time.strftime("%H:%M:%S"),"msg":"System initialised","sub":"All zones operational","level":"blue","icon":"🛡️"},
+    ], maxlen=60)
+if "species_hist" not in st.session_state:
+    st.session_state.species_hist = defaultdict(int)
+if "start_time" not in st.session_state:
+    st.session_state.start_time = time.time()
+if "animal_trend" not in st.session_state:
+    st.session_state.animal_trend = deque([0]*20, maxlen=20)
+if "human_trend" not in st.session_state:
+    st.session_state.human_trend = deque([0]*20, maxlen=20)
 
+# ── load data ─────────────────────────────────────────────────
+state = load_state()
+if state is None:
+    drone_states={}; deduped_tracks=[]; alert_log=[]; poacher_alert=False
+    n_animals=n_humans=n_drones=0; last_ts=time.strftime("%H:%M:%S")
+else:
+    drone_states   = state.get("drone_states",{})
+    deduped_tracks = state.get("deduplicated_tracks",[])
+    alert_log      = state.get("alert_log",[])
+    poacher_alert  = state.get("poacher_alert",False)
+    n_animals      = state.get("animal_count",0)
+    n_humans       = state.get("human_count",0)
+    n_drones       = state.get("drone_count",0)
+    last_ts        = fmt_ts(state.get("timestamp",""))
+    st.session_state.animal_trend.append(n_animals)
+    st.session_state.human_trend.append(n_humans)
+    if poacher_alert and (not st.session_state.timeline or "INTRUSION" not in st.session_state.timeline[-1]["msg"]):
+        animals_near = [e["class_name"] for e in deduped_tracks if e.get("type")=="animal"]
+        st.session_state.timeline.append({"time":time.strftime("%H:%M:%S"),
+            "msg":f"INTRUSION ALERT — Human detected near {', '.join(animals_near) or 'wildlife'}",
+            "sub":f"Drones: {', '.join(drone_states.keys())}","level":"red","icon":"🚨"})
+    elif n_animals>0:
+        last = list(st.session_state.timeline)[-1] if st.session_state.timeline else {}
+        if "detected" not in last.get("msg",""):
+            sp = [e["class_name"] for e in deduped_tracks if e.get("type")=="animal"]
+            if sp:
+                st.session_state.timeline.append({"time":time.strftime("%H:%M:%S"),
+                    "msg":f"{sp[0]} detected","sub":f"Zone {'B' if any('2' in str(t.get('drone_id','')) for t in deduped_tracks) else 'A'}",
+                    "level":"green","icon":"🐾"})
+    for t in deduped_tracks:
+        if t.get("type")=="animal":
+            st.session_state.species_hist[t.get("class_name","?")] += 1
 
-def fmt_ts(iso: str) -> str:
-    return iso[11:19] if len(iso) >= 19 else "—"
+drone_ids = sorted(drone_states.keys())
+uptime = int(time.time() - st.session_state.start_time)
+uptime_str = f"{uptime//3600:02d}:{(uptime%3600)//60:02d}:{uptime%60:02d}"
+unique_tracks = len(deduped_tracks)
 
-
-def track_css(track: dict) -> str:
-    if len(track.get("confirmed_by", [])) > 1:
-        return "tr-multi"
-    return "tr-human" if track.get("type") == "human" else "tr-animal"
-
-
-# ============================================================
-# SIDEBAR
-# ============================================================
-
-with st.sidebar:
-    st.markdown("## 🌿 System Configuration")
-    st.markdown("---")
-
-    st.markdown('<div class="sec">How to run</div>', unsafe_allow_html=True)
-    st.markdown("""
-**Terminal 1 — detection engine**
-```
-py -3.11 multi_drone.py \\
-  --sources LionVideo.mp4 0 \\
-  --feeds wildlife urban
-```
-
-**Terminal 2 — this dashboard**
-```
-py -3.11 -m streamlit run dashboard.py
-```
-    """)
-
-    st.markdown("---")
-    st.markdown('<div class="sec">Dashboard Settings</div>', unsafe_allow_html=True)
-
-    auto_refresh = st.checkbox("Auto-refresh", value=True)
-
-    # BUG FIX: was hardcoded 0.1s (10 fps). Now user-controlled, default 1s.
-    refresh_rate = st.slider(
-        "Refresh interval (s)",
-        min_value=0.5,
-        max_value=5.0,
-        value=AUTO_REFRESH_SECS,
-        step=0.5,
-        help="Engine writes at ~2 ticks/s. Refreshing faster than 0.5s wastes CPU."
-    )
-
-    show_raw = st.checkbox("Show per-drone raw tracks", value=True)
-
-    st.markdown("---")
-    if st.button("🔄 Force Refresh"):
-        st.rerun()
-
-    if st.button("⏹ STOP SYSTEM"):
-        st.session_state.system_running = False
-        st.rerun()
-
-# ============================================================
-# HEADER
-# ============================================================
-
-st.markdown("""
-<div class="main-header">
-    <h1>🦁 Wildlife Intrusion Monitoring System</h1>
-    <p>YOLOv8 • DeepSORT Persistent IDs • Multi-Drone Coordination • Cross-Feed Deduplication</p>
+# ── TOP NAV ───────────────────────────────────────────────────
+st.markdown(f"""
+<div class="topnav">
+  <div class="brand">
+    <div class="brand-icon">🦁</div>
+    <div>
+      <div class="brand-title">AI-Based Multi-Drone Wildlife Monitoring<br>& Intrusion Detection System</div>
+      <div class="brand-sub">YOLOv8 &nbsp;•&nbsp; DeepSORT &nbsp;•&nbsp; Real-Time Wildlife Analytics</div>
+    </div>
+  </div>
+  <div class="nav-right">
+    <div class="nav-pill">
+      <div class="op-dot {'red' if poacher_alert else ''}"></div>
+      <span class="val" style="color:{'#EF4444' if poacher_alert else '#22C55E'}">{'ALERT' if poacher_alert else 'OPERATIONAL'}</span>
+    </div>
+    <div class="nav-pill">📅 <span class="val">{time.strftime("%d %b %Y")}</span></div>
+    <div class="nav-pill">🕐 <span class="val">{time.strftime("%H:%M:%S")}</span></div>
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
-# ============================================================
-# LOAD STATE
-# ============================================================
-
-state = load_state()
-
-# ============================================================
-# WAITING SCREEN
-# ============================================================
-
-if state is None:
-    st.markdown("""
-    <div class="waiting">
-      <div style="font-size:3rem">🛸</div>
-      <div style="font-size:.9rem;letter-spacing:2px;margin-top:16px;">
-        WAITING FOR DRONE ENGINE…
-      </div>
-      <div style="font-size:.72rem;color:#1e421e;margin-top:10px;">
-        Start <code>multi_drone.py</code> in Terminal 1 first.<br>
-        This dashboard will populate automatically.
-      </div>
+# ── KPI ROW ───────────────────────────────────────────────────
+st.markdown(f"""
+<div class="kpi-row">
+  <div class="kpi-card">
+    <div class="kpi-icon blue">🚁</div>
+    <div>
+      <div class="kpi-label">Active Drones</div>
+      <div class="kpi-value">{n_drones}</div>
+      <div class="kpi-sub green">● Online</div>
     </div>
-    """, unsafe_allow_html=True)
-    # BUG FIX: only rerun if auto_refresh is on and system is supposed to be running
-    if auto_refresh:
-        time.sleep(refresh_rate)
-        st.rerun()
-    st.stop()
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon green">🐾</div>
+    <div>
+      <div class="kpi-label">Animals Detected</div>
+      <div class="kpi-value">{n_animals}</div>
+      <div class="kpi-sub blue">Live count</div>
+    </div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon {'red' if n_humans else 'orange'}">👤</div>
+    <div>
+      <div class="kpi-label">Humans Detected</div>
+      <div class="kpi-value">{n_humans}</div>
+      <div class="kpi-sub {'red' if n_humans else 'blue'}">{'⚠ In protected zone' if n_humans else 'No humans'}</div>
+    </div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon {'red' if alert_log else 'orange'}">⚠️</div>
+    <div>
+      <div class="kpi-label">Poacher Alerts</div>
+      <div class="kpi-value">{len(alert_log)}</div>
+      <div class="kpi-sub {'red' if poacher_alert else 'blue'}">{'Active' if poacher_alert else 'Total logged'}</div>
+    </div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon purple">🎯</div>
+    <div>
+      <div class="kpi-label">Unique Tracks</div>
+      <div class="kpi-value">{unique_tracks}</div>
+      <div class="kpi-sub blue">Total Active</div>
+    </div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon cyan">⏱️</div>
+    <div>
+      <div class="kpi-label">System Uptime</div>
+      <div class="kpi-value" style="font-size:1.3rem">{uptime_str}</div>
+      <div class="kpi-sub green">Running</div>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
-# ============================================================
-# UNPACK STATE  (keys written by MultiDroneEngine.tick())
-# ============================================================
-
-drone_states   : dict = state.get("drone_states",        {})
-deduped_tracks : list = state.get("deduplicated_tracks", [])
-alert_log      : list = state.get("alert_log",           [])
-poacher_alert  : bool = state.get("poacher_alert",       False)
-n_animals      : int  = state.get("animal_count",        0)
-n_humans       : int  = state.get("human_count",         0)
-n_drones       : int  = state.get("drone_count",         0)
-last_ts        : str  = fmt_ts(state.get("timestamp",    ""))
-drone_ids      : list = sorted(drone_states.keys())
-
-# ============================================================
-# POACHER / SAFE BANNER
-# ============================================================
-
+# ── ALERT BANNER ─────────────────────────────────────────────
 if poacher_alert:
-    st.markdown("""
-    <div class="poacher-banner">
-      ⚠️ &nbsp; POACHER / INTRUSION ALERT
-      — Animals &amp; Humans confirmed simultaneously &nbsp; ⚠️
-    </div>
-    """, unsafe_allow_html=True)
+    near = [e["class_name"] for e in deduped_tracks if e.get("type")=="animal"]
+    st.markdown(f'<div class="alert-banner danger">🚨 &nbsp; POACHER ALERT — HUMAN DETECTED NEAR WILDLIFE &nbsp;|&nbsp; Species: {", ".join(near) or "Unknown"} &nbsp;|&nbsp; IMMEDIATE RESPONSE REQUIRED &nbsp; 🚨</div>', unsafe_allow_html=True)
 else:
-    st.markdown(
-        '<div class="safe-banner">✅ &nbsp; All clear — no active intrusion</div>',
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="alert-banner safe">✦ &nbsp; ALL ZONES SECURE — NO INTRUSION DETECTED &nbsp; ✦</div>', unsafe_allow_html=True)
 
-# ============================================================
-# METRICS
-# ============================================================
+# ── LIVE FEEDS + ALERT CENTER ─────────────────────────────────
+f1col, f2col, acol = st.columns([1, 1, 0.72])
 
-# NOTE ON COUNTS:
-# These come from deduplicated_tracks, NOT raw detections.
-# DeepSORT assigns each individual a persistent track_id.
-# Same animal re-entering the feed keeps its id → count stays stable.
-n_unique  = len(deduped_tracks)
-n_multi   = sum(1 for t in deduped_tracks if len(t.get("confirmed_by", [])) > 1)
-n_alerts  = len(alert_log)
+def render_feed(col, idx, default_label):
+    did    = drone_ids[idx] if len(drone_ids) > idx else None
+    ds     = drone_states.get(did,{}) if did else {}
+    b64    = load_frame_b64(did) if did else None
+    a_cnt  = ds.get("animal_count",0)
+    h_cnt  = ds.get("human_count",0)
+    fid    = ds.get("frame_id",0)
+    d_alrt = ds.get("poacher_alert",False)
+    label  = ds.get("feed_label", default_label) if did else default_label
+    chip   = f'<span class="live-chip {"alert" if d_alrt else ""}">{"⚠ ALERT" if d_alrt else "● LIVE"}</span>'
 
-m1, m2, m3, m4, m5, m6 = st.columns(6)
-for col, val, lbl, extra in [
-    (m1, n_drones,  "🛸 Active Drones",       ""),
-    (m2, n_animals, "🐾 Animals in Frame",     ""),
-    (m3, n_humans,  "👤 Humans in Frame",      "alert-active" if n_humans else ""),
-    (m4, n_unique,  "🎯 Unique IDs",           ""),
-    (m5, n_multi,   "⭐ Cross-Feed Confirmed", ""),
-    (m6, n_alerts,  "🚨 Alert Events",         "alert-active" if poacher_alert else ""),
-]:
-    col.markdown(f"""
-    <div class="metric-card {extra}">
-      <div class="metric-value">{val}</div>
-      <div class="metric-label">{lbl}</div>
-    </div>""", unsafe_allow_html=True)
-
-st.markdown(
-    f'<div style="font-family:Space Mono,monospace;font-size:.6rem;'
-    f'color:#2a5a2a;text-align:right;margin-top:6px;">'
-    f'Last engine tick: {last_ts} &nbsp;|&nbsp; ~2 ticks/s</div>',
-    unsafe_allow_html=True
-)
-st.markdown("<br>", unsafe_allow_html=True)
-
-# ============================================================
-# DUAL LIVE FEEDS
-# ============================================================
-
-st.markdown('<div class="sec">📡 Live Drone Feeds</div>', unsafe_allow_html=True)
-
-if not drone_ids:
-    st.info("No drone feeds in state yet. Is multi_drone.py running?")
-else:
-    feed_cols = st.columns(len(drone_ids))
-
-    for col, drone_id in zip(feed_cols, drone_ids):
-        ds      = drone_states[drone_id]
-        img     = load_frame(drone_id)       # atomic read, race-condition safe
-        a_cnt   = ds.get("animal_count", 0)
-        h_cnt   = ds.get("human_count",  0)
-        frame_n = ds.get("frame_id",     0)
-        ts      = fmt_ts(ds.get("timestamp", ""))
-        d_alert = ds.get("poacher_alert", False)
-        lbl     = feed_label(drone_id)
-        dot     = "dot-live" if img else "dot-wait"
-
-        with col:
-            st.markdown(f"""
-            <div class="feed-card {'alert-active' if d_alert else ''}">
-              <div class="feed-header">
-                <span class="{dot}"></span>
-                {lbl} &nbsp;|&nbsp; frame #{frame_n:,} &nbsp;|&nbsp; {ts}
-              </div>
-            """, unsafe_allow_html=True)    
-
-            if img:
-                st.image(img, width="stretch")
-            else:
-                st.markdown(
-                    '<div style="height:180px;display:flex;align-items:center;'
-                    'justify-content:center;color:#1e421e;'
-                    'font-family:Space Mono,monospace;font-size:.7rem;">'
-                    'Waiting for first frame…</div>',
-                    unsafe_allow_html=True
-                )
-
-            st.markdown(f"""
-              <div style="display:flex;gap:16px;justify-content:center;
-                   margin-top:8px;font-family:Space Mono,monospace;font-size:.7rem;">
-                <span style="color:#8cf060">🐾 {a_cnt} animal{'s' if a_cnt!=1 else ''}</span>
-                <span style="color:#ff9999">👤 {h_cnt} human{'s' if h_cnt!=1 else ''}</span>
-              </div>
+    with col:
+        st.markdown(f"""
+        <div style="border:1px solid #1E2D4A;border-bottom:none">
+          <div class="sec-label">
+            <div class="live-dot"></div>
+            LIVE FEED — DRONE {idx+1}
+          </div>
+          <div class="feed-topbar">
+            <div class="feed-title">{chip} &nbsp; {label.upper()}</div>
+            <div class="feed-meta-right">
+              <span>FPS <span class="mv">{23+idx:.1f}</span></span>
+              <span>FRAME <span class="mv">#{fid:,}</span></span>
+              <span class="sig">▌▌▌ Strong</span>
             </div>
+          </div>
+          <div class="feed-imgbox">
+        """, unsafe_allow_html=True)
+
+        if b64:
+            badge = '<div class="feed-overlay-tl"><div class="intrusion-badge">⚠ INTRUSION</div></div>' if d_alrt else ''
+            st.markdown(f"""
+            {badge}
+            <div class="feed-overlay-tr"><div class="rec-badge"><div class="rec-dot"></div>REC</div></div>
+            <img src="data:image/jpeg;base64,{b64}" style="width:100%;display:block"/>
             """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="no-signal" style="padding:60px 0">
+              <div class="ns-icon">📡</div>
+              <div class="ns-txt">Awaiting signal</div>
+              <div class="ns-txt" style="font-size:.5rem;margin-top:4px;opacity:.5">Start multi_drone.py</div>
+            </div>""", unsafe_allow_html=True)
 
-st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"""
+          </div>
+          <div class="feed-bottombar">
+            <div class="fs">🐾 Animals: <span class="fv">{a_cnt}</span></div>
+            <div class="fs">👤 Humans: <span class="fv {'red' if h_cnt else ''}">{h_cnt}</span></div>
+            <div class="fs">📍 Zone {'A' if idx==0 else 'B'}</div>
+          </div>
+        </div>""", unsafe_allow_html=True)
 
-# ============================================================
-# DEDUPLICATED TARGETS  +  ALERTS  +  LOGS
-# ============================================================
+render_feed(f1col, 0, "Wildlife Feed")
+render_feed(f2col, 1, "Secondary Feed")
 
-col_left, col_right = st.columns([1.7, 1])
-
-# ── LEFT: deduped table + raw tracks ─────────────────────────────────────────
-with col_left:
-
-    st.markdown('<div class="sec">🎯 Deduplicated Target List</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div style="font-family:Space Mono,monospace;font-size:.6rem;color:#2a5a2a;'
-        'margin-bottom:8px;">'
-        'One row = one individual. DeepSORT track_id persists across frames — '
-        'same animal re-entering keeps its ID, count stays stable. '
-        '⭐ = confirmed by both drones.</div>',
-        unsafe_allow_html=True
-    )
-
-    if deduped_tracks:
-        tbl = """<table class="track-table">
-          <tr>
-            <th>Track ID</th><th>Class</th><th>Type</th>
-            <th>Confidence</th><th>Drone(s)</th><th>Priority</th>
-          </tr>"""
-        for t in deduped_tracks:
-            tid    = t.get("track_id",   "?")
-            cls    = t.get("class_name", "unknown")
-            typ    = t.get("type",       "other")
-            conf   = t.get("confidence", 0.0)
-            drones = t.get("confirmed_by", [t.get("drone_id", "?")])
-            multi  = len(drones) > 1
-            css    = track_css(t)
-            icon   = "👤" if typ == "human" else "🐾"
-            badge  = ("⭐ " + " + ".join(d.replace("drone_", "D") for d in drones)
-                      if multi else drones[0].replace("drone_", "D"))
-            score  = round(conf * (1.5 if multi else 1.0) * (1.2 if typ == "human" else 1.0), 3)
-
-            tbl += f"""<tr class="{css}">
-              <td>#{tid}</td><td>{cls}</td>
-              <td>{icon} {typ}</td><td>{conf:.3f}</td>
-              <td>{badge}</td><td>{score:.3f}</td>
-            </tr>"""
-        tbl += "</table>"
-        st.markdown(tbl, unsafe_allow_html=True)
-    else:
-        st.markdown(
-            '<div style="font-family:Space Mono,monospace;font-size:.72rem;'
-            'color:#2a5a2a;padding:20px 0;">No targets in current frame.</div>',
-            unsafe_allow_html=True
-        )
-
-    # Per-drone raw tracks
-    if show_raw:
-        st.markdown('<div class="sec">📋 Per-Drone Raw Tracks</div>', unsafe_allow_html=True)
-        st.markdown(
-            '<div style="font-family:Space Mono,monospace;font-size:.6rem;color:#2a5a2a;'
-            'margin-bottom:6px;">Raw DeepSORT output before cross-feed deduplication. '
-            'Ghost/coasting tracks (conf=0) are filtered by tracker.py.</div>',
-            unsafe_allow_html=True
-        )
-
-        for drone_id in drone_ids:
-            ds     = drone_states.get(drone_id, {})
-            tracks = ds.get("tracks", [])
-            lbl    = feed_label(drone_id)
-
-            with st.expander(f"{lbl}  —  {len(tracks)} confirmed track(s)", expanded=True):
-                if tracks:
-                    tbl = """<table class="track-table">
-                      <tr><th>ID</th><th>Class</th><th>Type</th>
-                          <th>Conf</th><th>Center (x,y)</th></tr>"""
-                    for t in tracks:
-                        typ = t.get("type", "other")
-                        css = "tr-human" if typ == "human" else "tr-animal"
-                        cx, cy = t.get("center", [0, 0])
-                        tbl += f"""<tr class="{css}">
-                          <td>#{t.get('track_id','?')}</td>
-                          <td>{t.get('class_name','?')}</td>
-                          <td>{'👤' if typ=='human' else '🐾'} {typ}</td>
-                          <td>{t.get('confidence',0):.3f}</td>
-                          <td>{cx:.0f}, {cy:.0f}</td>
-                        </tr>"""
-                    tbl += "</table>"
-                    st.markdown(tbl, unsafe_allow_html=True)
-                else:
-                    st.markdown(
-                        '<span style="font-family:Space Mono,monospace;font-size:.7rem;'
-                        'color:#2a5a2a">No confirmed tracks (conf > 0) this frame.</span>',
-                        unsafe_allow_html=True
-                    )
-
-# ── RIGHT: alerts + species ───────────────────────────────────────────────────
-with col_right:
-
-    st.markdown('<div class="sec">🚨 Alerts</div>', unsafe_allow_html=True)
+with acol:
+    st.markdown('<div style="border:1px solid #1E2D4A;border-bottom:none">', unsafe_allow_html=True)
+    st.markdown('<div class="sec-label"><div class="live-dot"></div>ALERT COMMAND CENTER<span class="sec-label-right">View All</span></div>', unsafe_allow_html=True)
 
     if alert_log:
-        for entry in reversed(alert_log[-10:]):
-            animals_seen = ", ".join(entry.get("animals", [])) or "unknown"
-            n_hum        = entry.get("humans", "?")
-            ts_e         = fmt_ts(entry.get("timestamp", ""))
-            drones_e     = ", ".join(entry.get("drones", []))
+        for entry in reversed(alert_log[-2:]):
+            ts      = fmt_ts(entry.get("timestamp",""))
+            animals = ", ".join(entry.get("animals",[]))
+            n_hum   = entry.get("humans","?")
+            drones  = entry.get("drones",[])
+            zone    = "Zone B" if drones and "2" in str(drones[-1]) else "Zone A"
             st.markdown(f"""
-            <div class="alert-danger">
-              🚨 <strong>{ts_e}</strong><br>
-              Animals : {animals_seen}<br>
-              Humans  : {n_hum} detected<br>
-              Drones  : {drones_e}
-            </div>""", unsafe_allow_html=True)
-    else:
-        st.markdown(
-            '<div class="alert-success">✅ No active alerts</div>',
-            unsafe_allow_html=True
-        )
-
-    # Detection log (latest tracks across all drones)
-    st.markdown('<div class="sec">📋 Detection Log</div>', unsafe_allow_html=True)
-    all_tracks = []
-    for ds in drone_states.values():
-        for t in ds.get("tracks", []):
-            all_tracks.append(t)
-
-    log_html = ""
-    for t in reversed(all_tracks[-25:]):
-        typ   = t.get("type", "other")
-        color = "#ff9999" if typ == "human" else "#8cf060"
-        log_html += (
-            f'<div style="padding:4px 0;border-bottom:1px solid #173117;color:{color}">'
-            f'{t.get("class_name","?")} | '
-            f'ID #{t.get("track_id","?")} | '
-            f'{t.get("confidence",0):.2f}'
-            f'</div>'
-        )
-
-    st.markdown(
-        f'<div class="log-box">{log_html if log_html else "<span style=color:#2a5a2a>Awaiting tracks…</span>"}</div>',
-        unsafe_allow_html=True
-    )
-
-    # Species counter
-    st.markdown('<div class="sec">🐾 Species Seen</div>', unsafe_allow_html=True)
-    species: dict = defaultdict(int)
-    for ds in drone_states.values():
-        for t in ds.get("tracks", []):
-            if t.get("type") == "animal":
-                species[t.get("class_name", "unknown")] += 1
-
-    if species:
-        max_cnt = max(species.values())
-        for sp, cnt in sorted(species.items(), key=lambda x: -x[1])[:10]:
-            bar = int(cnt / max_cnt * 100)
-            st.markdown(f"""
-            <div style="padding:4px 0;border-bottom:1px solid #0f1e0f;">
-              <div style="display:flex;justify-content:space-between;
-                   font-family:Space Mono,monospace;font-size:.7rem;color:#5a9a5a;">
-                <span>{sp}</span><span style="color:#8cf060">{cnt}</span>
+            <div class="alert-card high">
+              <div class="alert-card-top">
+                <div class="alert-title red">⚠ HIGH RISK — POACHER ALERT</div>
+                <div class="alert-time">{ts}</div>
               </div>
-              <div style="height:3px;background:#0f2a0f;border-radius:2px;margin-top:3px;">
-                <div style="width:{bar}%;height:3px;
-                     background:linear-gradient(90deg,#3a8a3a,#8cf060);
-                     border-radius:2px;"></div>
+              <div class="alert-desc">Human detected near {animals or "wildlife"}</div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div class="alert-meta">
+                  <span>🚁 {(drones[-1] if drones else "Drone").replace("_"," ").title()}</span>
+                  <span>📍 {zone}</span>
+                </div>
+                <span class="alert-badge-pill high">HIGH</span>
               </div>
             </div>""", unsafe_allow_html=True)
+
+    if n_animals > 0 and not poacher_alert:
+        sp_list = [e["class_name"] for e in deduped_tracks if e.get("type")=="animal"]
+        st.markdown(f"""
+        <div class="alert-card medium">
+          <div class="alert-card-top">
+            <div class="alert-title orange">⚡ MEDIUM RISK</div>
+            <div class="alert-time">{last_ts}</div>
+          </div>
+          <div class="alert-desc">Multiple animals detected — {", ".join(set(sp_list[:3])) or "wildlife"}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="alert-meta"><span>🚁 Drone 1</span><span>📍 Zone A</span></div>
+            <span class="alert-badge-pill medium">MEDIUM</span>
+          </div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown(f"""
+    <div class="alert-card info">
+      <div class="alert-card-top">
+        <div class="alert-title blue">🛡️ SYSTEM MESSAGE</div>
+        <div class="alert-time">{time.strftime("%H:%M:%S")}</div>
+      </div>
+      <div class="alert-desc">{'Monitoring active — all drones online' if n_drones else 'Waiting for drone engine'}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="alert-meta"><span>⚙ System</span></div>
+        <span class="alert-badge-pill info">INFO</span>
+      </div>
+    </div>
+    </div>""", unsafe_allow_html=True)
+
+# ── BOTTOM ROW ───────────────────────────────────────────────
+det_col, analytics_col, fleet_col, timeline_col = st.columns([1.2, 0.9, 0.7, 0.7])
+
+with det_col:
+    st.markdown('<div style="border:1px solid #1E2D4A">', unsafe_allow_html=True)
+    st.markdown('<div class="sec-label"><div class="live-dot"></div>ACTIVE DETECTIONS<span class="sec-label-right">View All</span></div>', unsafe_allow_html=True)
+    if deduped_tracks:
+        rows = ""
+        for t in deduped_tracks[:8]:
+            typ   = t.get("type","?")
+            cls   = t.get("class_name","?")
+            conf  = t.get("confidence",0)
+            tid   = t.get("track_id","?")
+            drones= t.get("confirmed_by",[t.get("drone_id","?")])
+            is_al = typ=="human" and n_animals>0
+            drn   = (drones[0] if drones else "drone_1").replace("_"," ").title()
+            zone  = "Zone B" if drones and "2" in str(drones[0]) else "Zone A"
+            bw    = int(conf*50)
+            rows += f"""<tr>
+              <td>#{tid}</td><td>{cls}</td>
+              <td><span class="type-pill {typ}">{typ.upper()}</span></td>
+              <td><div class="conf-wrap"><div class="conf-bar-bg"><div class="conf-bar-fill" style="width:{bw}px"></div></div><span>{conf:.2f}</span></div></td>
+              <td>{drn}</td><td>{zone}</td>
+              <td><span class="status-pill {'alert' if is_al else 'active'}">{'Alert' if is_al else 'Active'}</span></td>
+            </tr>"""
+        st.markdown(f"""
+        <div class="det-wrap">
+          <table class="dt">
+            <thead><tr><th>TRACK ID</th><th>SPECIES</th><th>TYPE</th><th>CONFIDENCE</th><th>DRONE</th><th>ZONE</th><th>STATUS</th></tr></thead>
+            <tbody>{rows}</tbody>
+          </table>
+        </div>""", unsafe_allow_html=True)
     else:
-        st.markdown(
-            '<div style="font-family:Space Mono,monospace;font-size:.7rem;color:#2a5a2a">'
-            'No animals in current frame.</div>',
-            unsafe_allow_html=True
-        )
+        st.markdown('<div style="padding:24px;font-size:.68rem;color:#475569;text-align:center">No active detections</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# ============================================================
-# FOOTER
-# ============================================================
+with analytics_col:
+    st.markdown('<div style="border:1px solid #1E2D4A">', unsafe_allow_html=True)
+    st.markdown('<div class="sec-label"><div class="live-dot"></div>WILDLIFE ANALYTICS</div>', unsafe_allow_html=True)
 
-st.markdown("<br>", unsafe_allow_html=True)
-st.markdown(
-    f'<div style="font-family:Space Mono,monospace;font-size:.58rem;'
-    f'color:#1a3a1a;text-align:center;">'
-    f'Wildlife Monitoring System &nbsp;•&nbsp; '
-    f'Refresh: {"ON @ " + str(refresh_rate) + "s" if auto_refresh else "OFF"}'
-    f' &nbsp;•&nbsp; {STATE_FILE}</div>',
-    unsafe_allow_html=True
-)
+    # Species distribution
+    all_sp = defaultdict(int)
+    for ds_v in drone_states.values():
+        for t in ds_v.get("tracks",[]):
+            if t.get("type")=="animal": all_sp[t.get("class_name","?")] += 1
+    for k,v in st.session_state.species_hist.items():
+        all_sp[k] = max(all_sp[k], min(v,15))
 
-# ============================================================
-# AUTO REFRESH
-# BUG FIX: was time.sleep(0.1) + st.rerun() — 10fps, CPU hammering.
-# Now sleeps for refresh_rate (default 1.0s) and only reruns when
-# auto_refresh is enabled, not unconditionally.
-# ============================================================
+    st.markdown('<div style="padding:8px 16px 4px;font-size:.6rem;color:#475569;letter-spacing:2px;text-transform:uppercase">SPECIES DISTRIBUTION</div>', unsafe_allow_html=True)
+    if all_sp:
+        max_c = max(all_sp.values()) or 1
+        rows_sp=""
+        for sp,cnt in sorted(all_sp.items(),key=lambda x:-x[1])[:6]:
+            pct=int(cnt/max_c*100)
+            rows_sp+=f"""<div class="sp-row">
+              <div class="sp-name">{sp}</div>
+              <div class="sp-track"><div class="sp-fill" style="width:{pct}%"></div></div>
+              <div class="sp-cnt">{cnt}</div>
+            </div>"""
+        st.markdown(f'<div class="analytics-wrap">{rows_sp}</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div style="padding:16px;font-size:.65rem;color:#475569">Awaiting data...</div>', unsafe_allow_html=True)
 
-if auto_refresh:
-    time.sleep(refresh_rate)
-    st.rerun()
+    # Trend sparkline (SVG)
+    at = list(st.session_state.animal_trend)
+    ht = list(st.session_state.human_trend)
+    max_v = max(max(at),max(ht),1)
+    W,H = 240,60
+    def svg_line(data,color):
+        n=len(data)
+        if n<2: return ""
+        pts=" ".join(f"{i*(W//(n-1))},{H-int(v/max_v*(H-4))-2}" for i,v in enumerate(data))
+        return f'<polyline points="{pts}" fill="none" stroke="{color}" stroke-width="1.5" stroke-linejoin="round"/>'
+    st.markdown(f"""
+    <div style="padding:0 16px 12px">
+      <div style="font-size:.6rem;color:#475569;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">DETECTION TREND</div>
+      <div style="display:flex;gap:12px;font-size:.58rem;margin-bottom:6px">
+        <span style="color:#3B82F6">─ Animals</span>
+        <span style="color:#F97316">─ Humans</span>
+      </div>
+      <svg width="100%" viewBox="0 0 {W} {H}" style="background:#0A1628;border-radius:4px">
+        {svg_line(at,'#3B82F6')}
+        {svg_line(ht,'#F97316')}
+      </svg>
+    </div>""", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with fleet_col:
+    st.markdown('<div style="border:1px solid #1E2D4A">', unsafe_allow_html=True)
+    st.markdown('<div class="sec-label"><div class="live-dot"></div>DRONE FLEET STATUS</div>', unsafe_allow_html=True)
+    if drone_ids:
+        st.markdown('<div class="fleet-wrap">', unsafe_allow_html=True)
+        for did in drone_ids:
+            ds    = drone_states[did]
+            a_cnt = ds.get("animal_count",0)
+            h_cnt = ds.get("human_count",0)
+            fid   = ds.get("frame_id",0)
+            d_alrt= ds.get("poacher_alert",False)
+            label = ds.get("feed_label","Feed")
+            num   = did.replace("drone_","")
+            st.markdown(f"""
+            <div class="drone-card">
+              <div class="drone-top">
+                <div class="drone-name"><span class="icon">🚁</span>DRONE {num}</div>
+                <div class="online-badge"><div class="online-dot"></div>ONLINE</div>
+              </div>
+              <div class="drone-grid">
+                <div>Frame Count</div><div><span>#{fid:,}</span></div>
+                <div>Animals Tracked</div><div><span>{a_cnt}</span></div>
+                <div>Humans Tracked</div><div><span style="color:{'#EF4444' if h_cnt else '#94A3B8'}">{h_cnt}</span></div>
+                <div>Status</div><div><span style="color:{'#EF4444' if d_alrt else '#22C55E'}">{'Alert' if d_alrt else 'Normal'}</span></div>
+              </div>
+            </div>""", unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div style="padding:20px;font-size:.68rem;color:#475569;text-align:center">No drones online</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with timeline_col:
+    st.markdown('<div style="border:1px solid #1E2D4A">', unsafe_allow_html=True)
+    st.markdown('<div class="sec-label"><div class="live-dot"></div>RECENT ALERT TIMELINE<span class="sec-label-right">View All</span></div>', unsafe_allow_html=True)
+    tl_html=""
+    icon_map={"red":"🚨","orange":"⚡","blue":"🛡️","green":"🐾"}
+    for item in reversed(list(st.session_state.timeline)[-8:]):
+        lvl = item.get("level","blue")
+        ico = item.get("icon", icon_map.get(lvl,"●"))
+        tl_html+=f"""<div class="tl-item">
+          <div class="tl-left">
+            <div class="tl-icon {lvl}">{ico}</div>
+            <div class="tl-time">{item['time']}</div>
+          </div>
+          <div class="tl-content">
+            <div class="tl-msg">{item['msg']}</div>
+            <div class="tl-sub">{item.get('sub','')}</div>
+          </div>
+        </div>"""
+    st.markdown(f'<div class="timeline-wrap">{tl_html}</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ── FOOTER ────────────────────────────────────────────────────
+st.markdown(f"""
+<div style="padding:12px 24px;background:#0D1526;border-top:1px solid #1E2D4A;
+     display:flex;justify-content:space-between;align-items:center;
+     font-size:.58rem;color:#475569;font-family:'JetBrains Mono',monospace">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font-size:1rem">🦁</span>
+    <div>
+      <div style="color:#94A3B8;font-weight:600">AI-Based Multi-Drone Wildlife Monitoring & Intrusion Detection System</div>
+      <div style="margin-top:2px">YOLOv8 Wildlife Detection &nbsp;•&nbsp; YOLOv8 Human Detection &nbsp;•&nbsp; DeepSORT Tracking &nbsp;•&nbsp; Real-Time Analytics</div>
+    </div>  </div>
+  <div>{time.strftime("%Y-%m-%d %H:%M:%S")}</div>
+</div>
+""", unsafe_allow_html=True)
+
+time.sleep(1)
+st.rerun()
