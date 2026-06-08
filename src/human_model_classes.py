@@ -1,3 +1,1 @@
-HUMAN_CLASSES = {
-    0: "person"
-}
+HUMAN_CLASSES = {0: "person"}
